@@ -34,6 +34,10 @@ public class NetworkManager : MonoBehaviour
     public Client Client { get; private set; }
     public float minTimeBetweenTicks { get; private set; }
 
+    [Header("Settings")]
+    [SerializeField] public float packetLossChance;
+    [SerializeField] public float inputMessageDelay;
+
     private void Awake()
     {
         Singleton = this;

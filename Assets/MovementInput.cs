@@ -49,10 +49,15 @@ public class MovementInput : MonoBehaviour
 
     private void Update()
     {
+        // This creates a fixed timestep to keep the server and the client syncronized
         timer += Time.deltaTime;
         while (timer >= NetworkManager.Singleton.minTimeBetweenTicks)
         {
             timer -= NetworkManager.Singleton.minTimeBetweenTicks;
+
+            // Gets the cache index 
+            // This works like, if its tick 300 cache index is 300 but when it gets past the cachesize it resets
+            // So when its tick 1025 cacheIndex is 1
             int cacheIndex = cSPTick % StateCacheSize;
 
             // Get the Inputs and store them in the cache
@@ -64,12 +69,16 @@ public class MovementInput : MonoBehaviour
             // Applies the movent
             playerMovement.SetInput(inputStateCache[cacheIndex].horizontal, inputStateCache[cacheIndex].vertical, inputStateCache[cacheIndex].jump);
 
-            // Sends a message containing this player input to the server im not the host
-            if (!NetworkManager.Singleton.Server.IsRunning) SendInput();
+            // Sends the inputs to the server
+            // Here i doing a probabiity check to simulate packet loss and also im using invoke with a delay to simulate high ping
+            // This should not be on your actual code, you can just call it directly
+            if (NetworkManager.Singleton.packetLossChance < UnityEngine.Random.Range(0, 100))
+            {
+                Invoke("SendInput", NetworkManager.Singleton.inputMessageDelay / 100);
+            }
 
             cSPTick++;
         }
-        if (NetworkManager.Singleton.Server.IsRunning) return; // Change
 
         // If there's a ServerSimState available checks for reconciliation
         if (serverSimulationState != null) Reconciliate();
@@ -106,8 +115,7 @@ public class MovementInput : MonoBehaviour
     private void Reconciliate()
     {
         // Makes sure that the ServerSimState is not outdated
-        print($"Last received tick was {lastCorrectedFrame} and the received one was {serverSimulationState.currentTick}");
-        if (serverSimulationState.currentTick <= lastCorrectedFrame) { print($"Stop Recon"); return; }
+        if (serverSimulationState.currentTick <= lastCorrectedFrame) return;
 
         int cacheIndex = serverSimulationState.currentTick % StateCacheSize;
 
@@ -117,7 +125,6 @@ public class MovementInput : MonoBehaviour
         // Find the difference between the Server Player Pos And the Client predicted Pos
         float posDif = Vector3.Distance(cachedSimulationState.position, serverSimulationState.position);
         float rotDif = 1f - Quaternion.Dot(serverSimulationState.rotation, cachedSimulationState.rotation);
-        print($"PosDif is {posDif} [C={cachedSimulationState.position} | S {serverSimulationState.position}]");
 
         // A correction is necessary.
         if (posDif > 0.0001f || rotDif > 0.0001f)
@@ -126,14 +133,13 @@ public class MovementInput : MonoBehaviour
             playerMovement.rb.position = serverSimulationState.position;
             playerMovement.speed = serverSimulationState.velocity;
             playerMovement.angularSpeed = serverSimulationState.angularVelocity;
-            playerMovement.rb.rotation = serverSimulationState.rotation;
+            playerMovement.rb.rotation = serverSimulationState.rotation.normalized;
 
             // Declare the rewindFrame as we're about to resimulate our cached inputs. 
             ushort rewindTick = serverSimulationState.currentTick;
 
             // Loop through and apply cached inputs until we're 
             // caught up to our current simulation frame.
-            print($"Rewinding {cSPTick - rewindTick} Ticks from {rewindTick} to {cSPTick}");
 
             while (rewindTick < cSPTick)
             {
@@ -145,13 +151,9 @@ public class MovementInput : MonoBehaviour
                 SimulationState rewindCachedSimulationState = simulationStateCache[rewindCacheIndex];
 
                 // Replace the simulationStateCache index with the new value.
-                print($"The position saved at {rewindCacheIndex} is {simulationStateCache[rewindCacheIndex].position}");
-
                 SimulationState rewoundSimulationState = CurrentSimulationState();
                 rewoundSimulationState.currentTick = rewindTick;
                 simulationStateCache[rewindCacheIndex] = rewoundSimulationState;
-
-                print($"The position saved at {rewindCacheIndex} is now{simulationStateCache[rewindCacheIndex].position} after sim");
 
                 playerMovement.readyToJump = rewindCachedInputState.readyToJump;
                 playerMovement.coyoteTimeCounter = rewindCachedInputState.coyoteTimeCounter;
@@ -170,11 +172,14 @@ public class MovementInput : MonoBehaviour
     private void SendInput()
     {
         Message message = Message.Create(MessageSendMode.Unreliable, ClientToServerId.input);
+
+
+        // First let's send the size of the list of Redundant messages being sent to the server
+        // As we send the inputs starting from the last received server tick until our current tick
+        // The quantity of message is going to be currentTick - lastReceived tick
         message.AddByte((byte)(cSPTick - serverSimulationState.currentTick));
 
         // Sends all the messages starting from the last received server tick until our current tick
-        print($"Sending {(cSPTick - serverSimulationState.currentTick)}");
-
         for (int i = serverSimulationState.currentTick; i < cSPTick; i++)
         {
             message.AddSByte(inputStateCache[i % StateCacheSize].horizontal);
@@ -183,5 +188,24 @@ public class MovementInput : MonoBehaviour
             message.AddUShort(inputStateCache[i % StateCacheSize].currentTick);
         }
         NetworkManager.Singleton.Client.Send(message);
+    }
+
+    [MessageHandler((ushort)ServerToClientId.playerMovement)]
+    private static void GetPlayerMovement(Message message)
+    {
+        // When we receive the processed movement back from the server we save it
+        // We have to also verify that the received movement is newer than the one we last received
+        ushort tick = message.GetUShort();
+        Vector3 speed = message.GetVector3();
+        Vector3 angularSpeed = message.GetVector3();
+        Vector3 position = message.GetVector3();
+
+        if (tick > PlayerController.Instance.clientMovementInput.serverSimulationState.currentTick)
+        {
+            PlayerController.Instance.clientMovementInput.serverSimulationState.velocity = speed;
+            PlayerController.Instance.clientMovementInput.serverSimulationState.angularVelocity = angularSpeed;
+            PlayerController.Instance.clientMovementInput.serverSimulationState.position = position;
+            PlayerController.Instance.clientMovementInput.serverSimulationState.currentTick = tick;
+        }
     }
 }

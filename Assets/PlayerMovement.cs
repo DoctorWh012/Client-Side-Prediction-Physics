@@ -13,6 +13,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private MovementSettings movementSettings;
     [SerializeField] private MovementInput movementInput;
 
+    [SerializeField] private bool serverPlayer;
+
     // Jump Related
     public bool readyToJump = true;
     public float coyoteTimeCounter;
@@ -33,6 +35,7 @@ public class PlayerMovement : MonoBehaviour
     }
     private void Start()
     {
+        // When not simulating an input the player RigidBody must be kinematic
         Physics.autoSimulation = true;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         rb.isKinematic = true;
@@ -58,10 +61,13 @@ public class PlayerMovement : MonoBehaviour
 
     private void MovementTick()
     {
+        // When starting to simulate the player movement we set it to not kinematic
+        // We also disable to autoSimulation to enable us to simulate it ourselfs
         Physics.autoSimulation = false;
         rb.isKinematic = false;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
+        // We restore the previous saved player speed
         rb.velocity = speed;
         rb.angularVelocity = angularSpeed;
         SpeedCap();
@@ -77,11 +83,14 @@ public class PlayerMovement : MonoBehaviour
         ApplyMovement();
         IncreaseFallGravity(movementSettings.gravity);
 
+        // After applying the movement we simulate the physics using the fixedTimeStep
         Physics.Simulate(NetworkManager.Singleton.minTimeBetweenTicks);
 
+        // We then save the player Speed
         speed = rb.velocity;
         angularSpeed = rb.angularVelocity;
-        
+
+        // After the player movement is processed we set him to kinematic again
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         rb.isKinematic = true;
         Physics.autoSimulation = true;
@@ -97,7 +106,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void HandleClientInput(ClientInputState[] inputs)
     {
-        if (inputs.Length == 0) { print("Returned because inputsLen was 0"); return; }
+        if (!serverPlayer || inputs.Length == 0) { print("Returned because inputsLen was 0"); return; }
 
         // Last input in the array is the newest one
         // Here we check to see if the inputs sent by the client are newer than the ones we already have received
@@ -164,45 +173,31 @@ public class PlayerMovement : MonoBehaviour
 
     private void SendMovement(ushort clientTick)
     {
-        if (!NetworkManager.Singleton.Server.IsRunning) return;
         Message message = Message.Create(MessageSendMode.Unreliable, ServerToClientId.playerMovement);
         message.AddUShort(clientTick);
         message.AddVector3(speed);
         message.AddVector3(angularSpeed);
         message.AddVector3(rb.position);
-        message.AddVector3(transform.forward);
         NetworkManager.Singleton.Server.SendToAll(message);
     }
 
-    // [MessageHandler((ushort)ServerToClientId.playerMovement)]
-    // private static void PlayerMove(Message message)
-    // {
-    //     Movement.Move(message.GetUShort(), message.GetUShort(), message.GetVector3(), message.GetVector3(), message.GetVector3(), message.GetVector3(), message.GetQuaternion());
-    // }
+    [MessageHandler((ushort)ClientToServerId.input)]
+    private static void Input(ushort fromClientId, Message message)
+    {
+        byte inputsQuantity = message.GetByte();
+        ClientInputState[] inputs = new ClientInputState[inputsQuantity];
 
-    // [MessageHandler((ushort)ClientToServerId.input)]
-    // private static void Input(ushort fromClientId, Message message)
-    // {
-    //     if (Player.list.TryGetValue(fromClientId, out Player player))
-    //     {
-    //         byte inputsQuantity = message.GetByte();
-    //         ClientInputState[] inputs = new ClientInputState[inputsQuantity];
+        for (int i = 0; i < inputsQuantity; i++)
+        {
+            inputs[i] = new ClientInputState
+            {
+                horizontal = message.GetSByte(),
+                vertical = message.GetSByte(),
+                jump = message.GetBool(),
+                currentTick = message.GetUShort()
+            };
+        }
 
-    //         for (int i = 0; i < inputsQuantity; i++)
-    //         {
-    //             inputs[i] = new ClientInputState
-    //             {
-    //                 horizontal = message.GetSByte(),
-    //                 vertical = message.GetSByte(),
-    //                 jump = message.GetBool(),
-    //                 currentTick = message.GetUShort()
-    //             };
-    //         }
-
-    //         player.Movement.HandleClientInput(inputs);
-
-    //         if (player.IsLocal) return;
-    //         player.Movement.SetNetPlayerOrientation(message.GetVector3(), message.GetQuaternion());
-    //     }
-    // }
+        PlayerController.Instance.serverPlayermovement.HandleClientInput(inputs);
+    }
 }

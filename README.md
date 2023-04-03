@@ -240,7 +240,18 @@ For now this is it before we tackle the Server Reconciliation
 
 #### Movement Script  
 
-In the movement script we create a `SetInput` function
+First of all for out client side prediction to work right all of the players RigidBodies have to be disable unless they are simulating an input so in the `Start` function we disable the RigidBody
+```cs
+private void Start()
+{
+    // When not simulating an input the player RigidBody must be kinematic
+    Physics.autoSimulation = true;
+    rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+    rb.isKinematic = true;
+}
+```
+
+We also create a `SetInput` function
 ```cs
 public void SetInput(float horizontal, float vertical, bool jump)
 {

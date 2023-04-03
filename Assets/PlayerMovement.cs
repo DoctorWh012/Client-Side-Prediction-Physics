@@ -33,6 +33,7 @@ public class PlayerMovement : MonoBehaviour
     {
         rb.freezeRotation = true;
     }
+    
     private void Start()
     {
         // When not simulating an input the player RigidBody must be kinematic

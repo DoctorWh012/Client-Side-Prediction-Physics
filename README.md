@@ -1,20 +1,20 @@
 # Client-Side-Prediction-Physics
 Step by step guide on how to do Client Side Prediction With a RigidBody/PhysicsBased movement system
 
-# This is an adaptaion of my [Previous Guide](https://github.com/DoctorWh012/Client-Side-Prediction) made to work on a RigidBody movement system
+# This is an adaptation of my [Previous Guide](https://github.com/DoctorWh012/Client-Side-Prediction) made to work on a RigidBody movement system.
 
 # What is client side prediction?
-Client side prediction is allowing the client to predict it's own movement in an authoritative server enviroment
-It is used for hiding the latency from the server receiving the input and sending it back to the player
+Client side prediction is allowing the client to predict it's own movement in an authoritative server enviroment.
+It is used for hiding the latency from the server receiving the input and sending it back to the player.
 
 # Server reconciliation 
-Sometimes the client position may drift from the position on the server, As our enviroment is server authoritative we always trust the server
-This means snaping the client to the position received from the server and processing the inputs again resulting in a prediction of what the correct position is
+Sometimes the client position may drift from the position on the server. As our enviroment is server authoritative we always trust the server
+This means snaping the client to the position received from the server and processing the inputs again, resulting in a prediction of what the correct position is.
 
 # Requirements
-In this demo i am using [Riptide Networking](https://riptide.tomweiland.net/manual/overview/about-riptide.html) but you can use any networking implementation
+In this demo i am using [Riptide Networking](https://riptide.tomweiland.net/manual/overview/about-riptide.html) but you can use any networking implementation.
 
-This implementation is made to work with a RigidBody/PhysicsBased movement system, in [This Guide](https://github.com/DoctorWh012/Client-Side-Prediction) i show you how to implement Client Side Prediction with a non PhysicsBased movement system
+This implementation is made to work with a RigidBody/PhysicsBased movement system. In [This Guide](https://github.com/DoctorWh012/Client-Side-Prediction), I show you how to implement Client Side Prediction with a non PhysicsBased movement system.
 
 # How to
 Now let's go step by step on how to implement client side prediction

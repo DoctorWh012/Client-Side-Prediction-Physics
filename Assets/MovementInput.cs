@@ -92,10 +92,6 @@ public class MovementInput : MonoBehaviour
             vertical = (sbyte)Input.GetAxisRaw("Vertical"),
             jump = Input.GetKey(jump),
 
-            readyToJump = playerMovement.readyToJump,
-            coyoteTimeCounter = playerMovement.coyoteTimeCounter,
-            jumpBufferCounter = playerMovement.jumpBufferCounter,
-
             currentTick = cSPTick
         };
     }
@@ -155,9 +151,7 @@ public class MovementInput : MonoBehaviour
                 rewoundSimulationState.currentTick = rewindTick;
                 simulationStateCache[rewindCacheIndex] = rewoundSimulationState;
 
-                playerMovement.readyToJump = rewindCachedInputState.readyToJump;
-                playerMovement.coyoteTimeCounter = rewindCachedInputState.coyoteTimeCounter;
-                playerMovement.jumpBufferCounter = rewindCachedInputState.jumpBufferCounter;
+                playerMovement.CheckIfGrounded();
 
                 // Process the cached inputs.
                 playerMovement.SetInput(rewindCachedInputState.horizontal, rewindCachedInputState.vertical, rewindCachedInputState.jump);

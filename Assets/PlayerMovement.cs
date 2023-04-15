@@ -16,9 +16,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private bool serverPlayer;
 
     // Jump Related
-    public bool readyToJump = true;
-    public float coyoteTimeCounter;
-    public float jumpBufferCounter;
+    public bool jumping;
 
     // Movement Related
     private float horizontalInput;
@@ -33,7 +31,7 @@ public class PlayerMovement : MonoBehaviour
     {
         rb.freezeRotation = true;
     }
-    
+
     private void Start()
     {
         // When not simulating an input the player RigidBody must be kinematic
@@ -54,8 +52,7 @@ public class PlayerMovement : MonoBehaviour
         verticalInput = vertical;
 
         // Jumping
-        if (jump) { jumpBufferCounter = movementSettings.jumpBufferTime; }
-        else jumpBufferCounter -= Time.deltaTime;
+        jumping = jump;
 
         MovementTick();
     }
@@ -74,12 +71,7 @@ public class PlayerMovement : MonoBehaviour
         SpeedCap();
         ApplyDrag();
 
-        if (jumpBufferCounter > 0 && coyoteTimeCounter > 0 && readyToJump)
-        {
-            readyToJump = false;
-            Jump();
-            Invoke("ResetJump", movementSettings.jumpCooldown);
-        }
+        if (jumping && grounded) Jump();
 
         ApplyMovement();
         IncreaseFallGravity(movementSettings.gravity);
@@ -97,12 +89,9 @@ public class PlayerMovement : MonoBehaviour
         Physics.autoSimulation = true;
     }
 
-    private void CheckIfGrounded()
+    public void CheckIfGrounded()
     {
         grounded = Physics.Raycast(groundCheck.position, Vector3.down, movementSettings.groundCheckHeight, ground);
-
-        if (grounded) coyoteTimeCounter = movementSettings.coyoteTime;
-        else coyoteTimeCounter -= Time.deltaTime;
     }
 
     private void HandleClientInput(ClientInputState[] inputs)
@@ -149,12 +138,6 @@ public class PlayerMovement : MonoBehaviour
         rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
 
         rb.AddForce(transform.up * movementSettings.jumpForce, ForceMode.Impulse);
-        coyoteTimeCounter = 0;
-    }
-
-    private void ResetJump()
-    {
-        readyToJump = true;
     }
 
     private void SpeedCap()

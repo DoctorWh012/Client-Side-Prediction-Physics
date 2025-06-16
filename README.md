@@ -1,3 +1,5 @@
+# This is outdated and does contain logic errors, i will fix it it in the future, but it is a good base to get the idea of how to handle CSP
+
 # Client-Side-Prediction-Physics
 Step by step guide on how to do Client Side Prediction With a RigidBody/PhysicsBased movement system
 
